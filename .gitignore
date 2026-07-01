@@ -1,0 +1,33 @@
+.DS_Store
+
+# Arduino build outputs
+build/
+build_*/
+*.bin
+*.elf
+*.eep
+*.hex
+*.map
+
+# Runtime logs and captured field data
+logs/
+*.log
+*.tsv
+DATA.CSV
+EVENT.CSV
+
+# Web app dependencies/build outputs
+communication_app/node_modules/
+communication_app/dist/
+communication_app/logs/
+communication_app/.venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Editor/local files
+.idea/
+.vscode/
+*.swp
+*.swo
