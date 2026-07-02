@@ -281,6 +281,9 @@ function App() {
   const [linkTestInterval, setLinkTestInterval] = useState("5.0");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const busyActionRef = useRef<string | null>(null);
+  // The /events EventSource is created once on mount; its onmessage goes through
+  // this ref so the handler always sees the current dest/deviceId selection.
+  const handleServerEventRef = useRef(handleServerEvent);
   const logId = useRef(0);
   const terminalRef = useRef<HTMLDivElement>(null);
   const effectiveFlags = flags & MAIN_FIRMWARE_FLAGS_MASK;
@@ -326,7 +329,7 @@ function App() {
     const source = new EventSource("/events");
     source.onmessage = (message) => {
       const event = JSON.parse(message.data);
-      handleServerEvent(event);
+      handleServerEventRef.current(event);
     };
     source.onerror = () => appendLog("warn", "event stream reconnecting");
     return () => source.close();
@@ -340,6 +343,10 @@ function App() {
   useEffect(() => {
     busyActionRef.current = busyAction;
   }, [busyAction]);
+
+  useEffect(() => {
+    handleServerEventRef.current = handleServerEvent;
+  });
 
   useEffect(() => {
     if (!linkTest || !connected || isRunning) return;
