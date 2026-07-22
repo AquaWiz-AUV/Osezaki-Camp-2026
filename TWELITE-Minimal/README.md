@@ -100,7 +100,7 @@ Waiting for PING...
 
 ## 2. PC側を実行する
 
-初回だけ `pyserial` を入れます。
+Python 3.10以降を使います。初回だけ `pyserial` を入れます。
 
 ```sh
 python3 -m pip install -r TWELITE-Minimal/requirements.txt
@@ -117,6 +117,55 @@ python3 TWELITE-Minimal/stick_test.py --self-test
 ```sh
 python3 TWELITE-Minimal/stick_test.py --list-ports
 ```
+
+## インタラクティブモードを別プログラムで自動検証する
+
+`interactive_mode_test.py`はPING/PONGとは独立した、保存操作を行わないインタラクティブモード専用テストです。通常モードから開始した場合と、既にインタラクティブモードのトップ画面へ入っていた場合の両方を同期し、次を自動確認します。
+
+1. `CONFIG`メニュー、`App_Uart`、ファームウェア版表示、Serial IDを検出する。
+2. Application ID、Channel、親子Logical ID、UART mode `A`を確認する。
+3. Enterによるメニュー再表示で、設定値が変化していないことを確認する。
+4. メニュー自身が`[ESC]:Exit`を表示する版だけ、ESC終了と再入場を確認する。
+5. `+++`による終了と再入場を2周行い、毎回同じ個体・版・全表示設定が読めることを確認する。
+6. 事前に成功した終了方法を最後にもう一度送り、通常動作モードと期待される状態（`APP_EXPECTED`）にする。
+
+ホストが送信するのは、インタラクティブモード切替用の`+`、`CONFIG`メニュー確認後の再表示用CR、メニューに対応表示があり終了・再入場まで成功した場合のESCだけです。`S`（保存）、`R`/`!`（リセット）、`:`（App選択）、`*`（追加メニュー）、各設定キー、App_Uart形式フレームは意図して送信しません。
+
+実行直前にTWELITEをハードウェアリセットし、通常動作モードまたは設定トップメニューから開始するのが最も安全です。設定値入力プロンプトやApp選択画面の途中では実行しないでください。このプログラムは標準仕様の115200 bps/8N1固定です。実効baudが異なる設定や`+++`を認識しない別ファームでは`+`が通常データとして解釈される可能性があります。このため「保存コマンドを意図して送らない」検査であり、未知のファームや誤baudで任意の副作用が絶対にないことを保証するものではありません。
+
+まずハードなしの自己テストを実行します。
+
+```sh
+python3 TWELITE-Minimal/interactive_mode_test.py --self-test
+```
+
+STICKを直接PCへ接続し、一覧からポートを選んで実行します。誤ったシリアル機器へ文字を送らないよう、このプログラムはポートの自動選択をしません。
+
+```sh
+python3 TWELITE-Minimal/interactive_mode_test.py --list-ports
+python3 TWELITE-Minimal/interactive_mode_test.py \
+  --port /dev/cu.usbserial-XXXXXXXX \
+  --profile stick
+```
+
+TR3側TWELITEを検査するときは、Nano Every経由ではなくTWELITE R/R2/R3などへ直接接続して実行します。
+
+```sh
+python3 TWELITE-Minimal/interactive_mode_test.py \
+  --port /dev/cu.usbserial-XXXXXXXX \
+  --profile client
+```
+
+Windows PowerShellでも同じコードを使えます。
+
+```powershell
+py -3 -m pip install -r TWELITE-Minimal\requirements.txt
+py -3 TWELITE-Minimal\interactive_mode_test.py --self-test
+py -3 TWELITE-Minimal\interactive_mode_test.py --list-ports
+py -3 TWELITE-Minimal\interactive_mode_test.py --port COM5 --profile stick
+```
+
+終了コードは`0=全必須項目PASS`、`1=通信・設定テストFAIL`、`2=ポートや引数などの実行エラー`です。最終表示の`APP_EXPECTED`は、無線フレームを使った通常動作の陽性確認をあえて行わず、直前まで再現できた終了操作から通常モードを推定した状態です。`UNKNOWN`や`reset TWELITE manually`が出た場合は、状態を推測して`+++`を追加送信せず、TWELITEをハードウェアリセットしてから再実行してください。保存済み設定を書き換えるプログラムではないため、設定不一致はTWELITE STAGEで直します。
 
 スティックのファームと設定を読み取りだけで診断します。設定の保存・変更はしません。
 
