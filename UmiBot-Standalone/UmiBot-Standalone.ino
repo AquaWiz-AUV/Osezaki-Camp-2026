@@ -81,6 +81,10 @@ namespace Timing {
  * ASCENT_WAIT_S（浮上待ち時間）
  *   注入後に両方の弁を閉じ、機体が浮上するのを待つ時間です。
  *   この時間が終わると 1 サイクル完了となり、次の準備時間へ戻ります。
+ *
+ * 各値は秒単位です。0にしたフェーズは待ち時間なしで次へ進みます。
+ * 実際の切り替わりには、センサー取得やSD書き込みの処理時間による
+ * わずかな遅れが加わることがあります。
  */
 const uint16_t PREPARE_S = 5;         // デフォルト: 5 秒
 const uint16_t EXHAUST_OPEN_S = 60;   // デフォルト: 60 秒
@@ -89,8 +93,21 @@ const uint16_t BOTTOM_WAIT_S = 120;   // デフォルト: 120 秒
 const uint16_t INJECTION_OPEN_S = 20; // デフォルト: 20 秒
 const uint16_t ASCENT_WAIT_S = 120;   // デフォルト: 120 秒
 
-const uint16_t STATUS_INTERVAL_100MS = 10;
-const unsigned long SENSOR_UPDATE_MS = 500UL; // センサー更新・データ記録: 0.5 秒
+/*
+ * STATUS_INTERVAL_100MS（LCD更新間隔、単位: 0.1秒）
+ *   10なら1秒ごとに表示を更新します。センサー取得やSD記録の間隔には
+ *   影響しません。通常はデフォルトの10のままで構いません。
+ */
+const uint16_t STATUS_INTERVAL_100MS = 10; // デフォルト: 10（1秒）
+
+/*
+ * SENSOR_UPDATE_MS（センサー取得・データ記録間隔、単位: ms）
+ *   センサーを更新した直後に、同じタイミングでDATA.CSVへ1行書きます。
+ *   500なら約0.5秒ごと（約2回/秒）です。弁の開放中やミッション終了後も
+ *   この間隔で取得と記録を続けます。短くすると測定回数とSD書き込み回数が
+ *   増えます。処理時間があるため、実際の間隔は設定値以上になることがあります。
+ */
+const unsigned long SENSOR_UPDATE_MS = 500UL; // デフォルト: 500ms（0.5秒）
 const unsigned long LCD_UPDATE_MS = STATUS_INTERVAL_100MS * 100UL;
 const unsigned long I2C_TIMEOUT_US = 25000UL;
 }
@@ -102,13 +119,31 @@ constexpr const char* LOG_VERSION = "3.6";
 constexpr const char* DATA_LOG_FILENAME = "DATA.CSV";
 constexpr const char* EVENT_LOG_FILENAME = "EVENT.CSV";
 
-constexpr uint16_t PLAN_ID = 1;
-constexpr uint16_t PLAN_REPEAT_COUNT = 0xFFFF; // デフォルト: 無制限に繰り返す
-
-// 深度トリガーの単位は cm です。0 のときは無効で、通常の時間どおりに進みます。
-// 例: 1000 にすると、潜降中に深度 10 m へ達した時点で、残りの潜降・待機時間を
-// 待たずに INJECTION_OPEN フェーズへ進み、浮上動作を開始します。
-constexpr uint16_t PLAN_DEPTH_TRIGGER_CM = 0;
+/*
+ * 【普段変更する設定】
+ *
+ * PLAN_ID（ミッション番号）
+ *   DATA.CSV と EVENT.CSV に記録する識別番号です。
+ *   異なる実験をログ上で区別したいときに変更します。
+ *   この番号を変えても、弁の動作や測定内容は変わりません。
+ *
+ * PLAN_REPEAT_COUNT（繰り返し回数）
+ *   上記の6フェーズを何サイクル実行するかを指定します。
+ *   1なら1サイクル、2なら2サイクルです。0xFFFFなら、電源を切るまで
+ *   無制限に繰り返します。0を指定しても最初の1サイクルは始まるため、
+ *   有限回にする場合は1以上を指定してください。
+ *
+ * PLAN_DEPTH_TRIGGER_CM（浮上を開始する深度、単位: cm）
+ *   0なら深度トリガーを使わず、上記の時間だけで進みます。
+ *   例: 1000なら、排気・潜降・下降後待機中に深度10mへ達した時点で、
+ *   残り時間を待たずにINJECTION_OPENへ進み、浮上動作を始めます。
+ *   深度センサーの値が無効な間はトリガーせず、時間どおりに進みます。
+ *   このスケッチで有効とする深度は最大300mなので、実用上の設定範囲は
+ *   1～30000cmです。深度換算は下記のFLUID_DENSITYにも左右されます。
+ */
+constexpr uint16_t PLAN_ID = 1;                  // デフォルト: 1
+constexpr uint16_t PLAN_REPEAT_COUNT = 0xFFFF;  // デフォルト: 無制限
+constexpr uint16_t PLAN_DEPTH_TRIGGER_CM = 0;   // デフォルト: 0cm（無効）
 
 constexpr uint8_t STATE_SAFE_IDLE = 0x00;
 constexpr uint8_t STATE_RUNNING = 0x02;
@@ -130,7 +165,15 @@ constexpr uint16_t ERR_SENSOR_STALE = 0x0400;
 
 constexpr uint32_t USB_BAUD = 115200;
 constexpr uint32_t GPS_BAUD = 9600;
-constexpr float FLUID_DENSITY = 997.0f;
+
+/*
+ * FLUID_DENSITY（深度計算に使う液体密度、単位: kg/m^3）
+ *   997は淡水の目安です。海水で使用する場合は、海水の目安である1029などへ
+ *   変更します。値を大きくすると、同じ圧力から計算される深度は小さくなります。
+ *   DATA.CSVのdepth_m、max_mと深度トリガーに影響しますが、圧力の生値
+ *   press_mbarと温度には影響しません。
+ */
+constexpr float FLUID_DENSITY = 997.0f; // デフォルト: 997kg/m^3（淡水）
 
 // ============================================================
 // Runtime data
