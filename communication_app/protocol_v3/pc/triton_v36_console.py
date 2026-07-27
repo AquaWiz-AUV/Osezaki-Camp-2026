@@ -338,7 +338,12 @@ def main() -> int:
     parser.add_argument("--dest", type=parse_int_auto, default=0x78, help="TWELITE child logical ID")
     parser.add_argument("--device-id", type=parse_int_auto, default=1, help="Triton device_id")
     parser.add_argument("--action", choices=["demo", "load", "start", "stop", "status", "nop"], default="demo")
-    parser.add_argument("--seq", type=parse_int_auto, default=1, help="first CMD seq")
+    parser.add_argument(
+        "--seq",
+        type=parse_int_auto,
+        default=None,
+        help="first CMD seq. Default: random, so reruns within the firmware 30 s ACK cache do not collide",
+    )
     parser.add_argument("--run-seconds", type=float, default=3.0, help="demo observation window after START")
     parser.add_argument("--heartbeat", type=float, default=0.8, help="REQUEST_STATUS interval in demo")
     parser.add_argument("--no-stop", action="store_true", help="do not send STOP_SAFE at demo end")
@@ -399,7 +404,7 @@ def main() -> int:
     ser = open_serial(args.port)
     logger = WireLogger(args.log_file, args.port)
     rx = Receiver(ser, raw=args.raw, logger=logger)
-    seq = args.seq & 0xFFFF
+    seq = (args.seq if args.seq is not None else random.randrange(1, 0x10000)) & 0xFFFF
 
     print(f"Opened TWELITE STICK: {args.port}")
     print(f"dest=0x{args.dest:02X} device_id=0x{args.device_id:02X} action={args.action}")

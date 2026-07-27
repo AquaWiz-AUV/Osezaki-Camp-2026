@@ -180,7 +180,6 @@ class TritonBackend:
         self.port = ""
         self.connected = False
         self.seq = self._seed_seq()
-        self.buffer = b""
         self.reader_thread: threading.Thread | None = None
         self.stop_event = threading.Event()
         self.lock = threading.RLock()
@@ -230,17 +229,26 @@ class TritonBackend:
             self.serial_port = ser
             self.port = port
             self.connected = True
-            self.buffer = b""
             self.ack_by_seq.clear()
-            self.stop_event.clear()
-            self.reader_thread = threading.Thread(target=self._reader_loop, name="triton-web-serial", daemon=True)
+            # Fresh Event per connection: a lingering reader thread from a previous
+            # connection keeps its own (already set) event and can never race this one.
+            stop_event = threading.Event()
+            self.stop_event = stop_event
+            self.reader_thread = threading.Thread(
+                target=self._reader_loop,
+                args=(ser, stop_event),
+                name="triton-web-serial",
+                daemon=True,
+            )
             self.reader_thread.start()
         self.log("ok", f"connected {port}", port=port)
         self.hub.publish("connection", self.snapshot())
         return self.snapshot()
 
-    def disconnect(self) -> dict[str, Any]:
+    def disconnect(self, expected_ser: Any | None = None) -> dict[str, Any]:
         with self.lock:
+            if expected_ser is not None and self.serial_port is not expected_ser:
+                return self.snapshot()
             self.stop_event.set()
             ser = self.serial_port
             self.serial_port = None
@@ -488,24 +496,23 @@ class TritonBackend:
                     return None
                 self.ack_condition.wait(remaining)
 
-    def _reader_loop(self) -> None:
-        while not self.stop_event.is_set():
-            with self.lock:
-                ser = self.serial_port
-            if ser is None:
-                break
+    def _reader_loop(self, ser: Any, stop_event: threading.Event) -> None:
+        buffer = b""
+        while not stop_event.is_set():
             try:
                 chunk = ser.read(4096)
             except Exception as exc:
-                if not self.stop_event.is_set():
+                if not stop_event.is_set():
                     self.log("error", f"serial read failed: {exc}")
-                    self.disconnect()
+                    self.disconnect(expected_ser=ser)
+                break
+            if stop_event.is_set():
                 break
             if not chunk:
                 continue
-            self.buffer += chunk
-            while b"\n" in self.buffer:
-                raw_line, self.buffer = self.buffer.split(b"\n", 1)
+            buffer += chunk
+            while b"\n" in buffer:
+                raw_line, buffer = buffer.split(b"\n", 1)
                 raw_line = raw_line.rstrip(b"\r")
                 self._handle_line(raw_line)
 
