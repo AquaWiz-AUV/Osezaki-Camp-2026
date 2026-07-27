@@ -13,6 +13,14 @@ Osezaki-Camp-2026/
 │   └── Triton-3.ino
 ├── UmiBot/
 │   └── UmiBot.ino
+├── Triton-3-Standalone/
+│   └── Triton-3-Standalone.ino
+├── UmiBot-Standalone/
+│   └── UmiBot-Standalone.ino
+├── log_viewer/
+│   ├── src/
+│   ├── public/samples/
+│   └── dist/
 └── communication_app/
     ├── server.py
     ├── package.json
@@ -22,6 +30,8 @@ Osezaki-Camp-2026/
 
 - `Triton-3/Triton-3.ino`: Arduino Nano Every に書き込む Triton-3 本体プログラム。
 - `UmiBot/UmiBot.ino`: Arduino Nano Every に書き込む UmiBot 本体プログラム。
+- `Triton-3-Standalone/` / `UmiBot-Standalone/`: 通信なしで起動時に自律実行する版。
+- `log_viewer/`: Standalone版のDATA/EVENT CSVを端末内だけで検証・表示するReact静的サイト。
 - `communication_app/`: ブラウザから TWELITE STICK を操作する通信アプリ。
 - `communication_app/protocol_v3/pc/`: 通信アプリが使う Triton-3 v3.6 protocol 実装。
 
@@ -152,6 +162,19 @@ microSD には主に次の CSV が出力されます。
 排気弁または注入弁が開いている制御フェーズ中も、`DATA.CSV` は 0.5 秒間隔で記録します。重い I/O を避けるため、EVENT の flush や LCD 更新は弁制御中に抑制される場合があります。
 
 UmiBotでは standalone 温度センサがないため、Webアプリの `Water Temp` と `TEMP` status flag はMS5837の温度から作ります。CSVでは `water_c` を欠損扱いにし、MS5837温度は既存の `press_c` 列に記録します。
+
+## Standaloneログを静的ビューアで確認する
+
+`log_viewer/` はバックエンド不要のReact/Viteアプリです。Triton-3とUmiBotで同じv3.6ヘッダーを使いながら温度・SD列の意味が異なる点、再起動後の追記、`millis()`周回、CSV破損を機種別に検証します。`UmiBot-Standalone` はMS5837温度を `water_c` と `press_c` の両方へ記録するため、ビューアでは独立した2センサーとして扱いません。
+
+```sh
+cd log_viewer
+npm install
+npm test
+npm run build
+```
+
+Cloudflare等へは生成された `log_viewer/dist/` をそのまま配置できます。正常／敵対的ダミーCSVは画面に内蔵し、元ファイルも `log_viewer/public/samples/` にあります。設計判断と敵対的試験項目は `log_viewer/AUDIT.md` を参照してください。
 
 ## 現場での確認手順
 
