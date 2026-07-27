@@ -281,6 +281,7 @@ function App() {
   const [linkTestInterval, setLinkTestInterval] = useState("5.0");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const busyActionRef = useRef<string | null>(null);
+  const selectedDeviceIdRef = useRef<number | null>(0x01);
   const logId = useRef(0);
   const terminalRef = useRef<HTMLDivElement>(null);
   const effectiveFlags = flags & MAIN_FIRMWARE_FLAGS_MASK;
@@ -342,6 +343,11 @@ function App() {
   }, [busyAction]);
 
   useEffect(() => {
+    const parsed = asNumber(deviceId || "");
+    selectedDeviceIdRef.current = Number.isFinite(parsed) ? parsed : null;
+  }, [deviceId]);
+
+  useEffect(() => {
     if (!linkTest || !connected || isRunning) return;
     const ms = Math.max(250, Math.round(Number.parseFloat(linkTestInterval || "1") * 1000));
     const timer = window.setInterval(() => {
@@ -380,8 +386,7 @@ function App() {
   }
 
   function selectedDeviceId(): number | null {
-    const parsed = asNumber(deviceId || "");
-    return Number.isFinite(parsed) ? parsed : null;
+    return selectedDeviceIdRef.current;
   }
 
   function isSelectedDevice(payload: { deviceId?: number }) {
