@@ -99,8 +99,8 @@ const uint8_t GPS_RX = 2;
 const uint8_t GPS_TX = 3;
 const uint8_t VALVE_INJECTION = 7;
 const uint8_t VALVE_EXHAUST = 6;
-const uint8_t LED_GREEN = 8;
-const uint8_t LED_RED = 9;
+const uint8_t LED_GREEN = 9;
+const uint8_t LED_RED = 8;
 }
 
 namespace Timing {
